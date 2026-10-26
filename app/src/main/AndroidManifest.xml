@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Pleos Vehicle SDK 조회 권한 -->
+    <uses-permission android:name="pleos.car.permission.CAR_CLIMATE" />
+    <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <uses-permission android:name="pleos.car.permission.CAR_ENERGY" />
+    <uses-permission android:name="pleos.car.permission.CAR_INFO" />
+    <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />
+    <uses-permission android:name="pleos.car.permission.CAR_POWERTRAIN" />
+    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
+    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
+    <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />
+
+    <!-- Pleos Vehicle SDK 제어 권한 -->
+    <uses-permission android:name="pleos.car.permission.CONTROL_CAR_CLIMATE" />
+    <uses-permission android:name="pleos.car.permission.CONTROL_CAR_DOORS" />
+    <uses-permission android:name="pleos.car.permission.CONTROL_CAR_SEATS" />
+    <uses-permission android:name="pleos.car.permission.CONTROL_CAR_WINDOWS" />
+
+    <!-- 음성 안내(TTS) 엔진 조회 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ChabakON">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.ChabakON">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

@@ -1,0 +1,5 @@
+차량 3D 모델 출처 (CC BY 4.0)
+- 모델: "2022 Mahindra Scorpio-N" by BHP3D
+- 주소: https://sketchfab.com/3d-models/2022-mahindra-scorpio-n-538b10f2860f44e694dc3e9d3e223bf8
+- 라이선스: Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/)
+- 변경 사항: 지붕 제거(절단 렌더), 좌우 반전(좌핸들), 차체·시트 색상 변경, 3열 시트 제거, 위에서 내려다본 2D 이미지로 렌더링- 사용처: 좌석 평면도(car_interior.png), 홈 화면 카드 그림(home_flatten/home_sleep/home_morning.png, 트렁크 열림·실내 조명·달·해 합성)
