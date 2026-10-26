@@ -11,7 +11,7 @@
 
 ## APK 파일 위치
 
-- 이 저장소의 **Releases** 페이지 → **v0.1.0** → `김이로_차박ON_release.apk` (약 45MB, GitHub 웹 업로드 용량 초과로 Releases에 등록)
+- 이 저장소의 **Releases** 페이지(https://github.com/yg440041-hue/ChabakON/releases/tag/v0.1.0) → **v0.1.0** → `KimIro_ChabakON_release.apk` (약 45MB, GitHub 웹 업로드 용량 초과로 Releases에 등록)
 - release 빌드이며, 바로 설치·실행할 수 있도록 서명되어 있습니다.
 
 ---
@@ -20,9 +20,9 @@
 
 ### 방법 1. APK로 바로 실행
 1. Pleos Connect Emulator(v2.1.0, API 34)를 실행합니다.
-2. APK를 에뮬레이터 화면으로 끌어다 놓거나, 아래 명령으로 설치합니다.
+2. Releases에서 받은 APK를 에뮬레이터 화면으로 끌어다 놓거나, 아래 명령으로 설치합니다.
    ```
-   adb install -r apk/김이로_차박ON_release.apk
+   adb install -r KimIro_ChabakON_release.apk
    ```
 3. 앱 목록(하단 독)에서 **차박ON**을 실행합니다.
 
