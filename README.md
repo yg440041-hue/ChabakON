@@ -61,7 +61,7 @@ adb forward tcp:8088 tcp:8088
 - **어린이 보호 잠금 PIN 기본값: `0000`** (상단 'PIN 설정'에서 변경·끄기 가능)
 - PIN 초기화: 브레이크 페달을 밟은 상태(Virtual Console > Motion > 브레이크 페달 > 0 초과)에서 'PIN을 잊었어요' → '5초간 누르기'
 - 에뮬레이터 기본값은 2열에 사람이 앉아 있는 상태라 시작 버튼이 꺼져 있습니다. Virtual Console에서 2열 좌석을 비워 주세요.
-- 음성 정지 시험: 에뮬레이터 Extended Controls > Microphone > **Enable Host Microphone Access** 를 켜고, 평탄화 중에 멈춰라고 또렷하게 말합니다.
+- 음성 정지 시험: 에뮬레이터 Extended Controls > Microphone > **Enable Host Microphone Access** 를 켜고, 평탄화 중에 "멈춰"라고 또렷하게 말합니다.
 - 상단 '로그' 칩: 모든 SDK 호출 결과 확인
 
 ---
@@ -87,6 +87,7 @@ adb forward tcp:8088 tcp:8088
 - **HVAC / Window**: 공조 전원·온도·풍량, 2열 창문 환기
 - **Gear / Brake / EV Battery**: 기어 P, 브레이크 페달 상태, 배터리 잔량
 - 각 도메인의 `check...Capabilities`로 차종별 지원 기능과 영역을 판별
+- **SpeechToText (ON_DEVICE)**: 시트 작동 중에만 음성 인식을 켜고, 정지 단어를 들으면 즉시 정지. 에뮬레이터에서는 앱이 녹음한 PCM을 `sendAudio()`로 전달
 
 ## 알려진 제한 및 다음 계획
 - 앰비언트 조명 밝기 제어: 현재 SDK 공개 API에 설정 함수가 없어 화면 취침등으로 대체
