@@ -14,6 +14,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -148,6 +149,9 @@ fun ChabakApp(vm: ChabakViewModel) {
     var showSim by remember { mutableStateOf(false) }
     var hereRect by remember { mutableStateOf(Rect.Zero) }
     val currentHere by rememberUpdatedState(hereRect)
+    // '멈춰 (테스트)' 버튼 자리: 화면 터치 정지에서 빼서 음성 정지로 멈추게
+    var voiceTestRect by remember { mutableStateOf(Rect.Zero) }
+    val currentVoiceTest by rememberUpdatedState(voiceTestRect)
     val active = s.touchStopActive
     // 차량 화면의 뒤로가기도 홈으로
     BackHandler(enabled = s.canGoHome()) { vm.go(Screen.HOME) }
@@ -174,7 +178,7 @@ fun ChabakApp(vm: ChabakViewModel) {
                     while (true) {
                         val ev = awaitPointerEvent(PointerEventPass.Initial)
                         val down = ev.changes.firstOrNull { it.pressed && !it.previousPressed }
-                        if (down != null && !currentHere.contains(down.position)) {
+                        if (down != null && !currentHere.contains(down.position) && !currentVoiceTest.contains(down.position)) {
                             vm.emergencyStop("화면 터치")
                         }
                     }
@@ -199,7 +203,7 @@ fun ChabakApp(vm: ChabakViewModel) {
                 when (s.screen) {
                     Screen.HOME -> HomeScreen(s, vm)
                     Screen.CHECK -> CheckScreen(s, vm)
-                    Screen.FLATTEN -> FlattenScreen(s, vm) { hereRect = it }
+                    Screen.FLATTEN -> FlattenScreen(s, vm, onVoiceTestBounds = { voiceTestRect = it }) { hereRect = it }
                     Screen.SLEEP -> SleepScreen(s, vm)
                     Screen.MORNING -> MorningScreen(s, vm)
                 }
@@ -580,7 +584,7 @@ fun CheckScreen(s: UiState, vm: ChabakViewModel) {
             Modifier.width(400.dp).fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            StopMethods(Modifier.weight(1f))
+            StopMethods(Modifier.weight(1f), voice = s.voiceReady)
 
             BigButton(if (s.flatDone) "이미 평탄화됨" else "평탄화 시작", enabled = s.canStart() && !s.flatDone) { vm.startFlatten() }
             GhostButton("취소") { vm.go(Screen.HOME) }
@@ -617,15 +621,21 @@ fun SafetyChecklist(
             }
         }
         Panel(Modifier.fillMaxWidth()) {
-            s.checkItems().forEachIndexed { i, item ->
+            val items = s.checkItems()
+            items.forEachIndexed { i, item ->
+                val isArea = i == items.lastIndex
                 CheckRow(
                     title = item.title,
                     sub = item.sub,
                     ok = item.ok,
-                    action = if (i == SENSOR_ITEMS && s.childLockEnabled && !s.childUnlocked) "PIN 입력" else null,
-                    onAction = onPin
+                    action = when {
+                        i == SENSOR_ITEMS && s.childLockEnabled && !s.childUnlocked -> "PIN 입력"
+                        isArea && !s.areaClear -> "확인했어요"
+                        else -> null
+                    },
+                    onAction = if (isArea) ({ vm.setAreaClear(true) }) else onPin
                 )
-                if (i < SENSOR_ITEMS) HorizontalDivider(color = C.line)
+                if (i < items.lastIndex) HorizontalDivider(color = C.line)
             }
         }
         if (s.hasUnknown()) {
@@ -672,7 +682,8 @@ fun CheckRow(title: String, sub: String, ok: Boolean?, action: String?, onAction
             Sub(sub, 16.sp)
         }
         if (action != null) {
-            TextButton(onClick = onAction) { Text(action, color = C.amber, fontSize = 19.sp, fontWeight = FontWeight.Bold) }
+            // 눌러야 하는 항목은 글자가 아니라 볼록한 버튼으로
+            BigButton(action, Modifier.width(150.dp), height = 48.dp, fontSize = 19.sp, onClick = onAction)
         } else {
             Text(
                 when (ok) { true -> "통과"; false -> "확인 필요"; null -> "센서 없음" },
@@ -783,7 +794,12 @@ fun LinkButton(text: String, color: Color = C.amber, onClick: () -> Unit) =
 // ============================================================ 평탄화
 
 @Composable
-fun FlattenScreen(s: UiState, vm: ChabakViewModel, onHereBounds: (Rect) -> Unit) {
+fun FlattenScreen(
+    s: UiState,
+    vm: ChabakViewModel,
+    onVoiceTestBounds: (Rect) -> Unit = {},
+    onHereBounds: (Rect) -> Unit
+) {
     val anyHere = s.phase == FlatPhase.RUNNING && s.steps.any { it.status == StepStatus.RUNNING }
     if (!anyHere) SideEffect { onHereBounds(Rect.Zero) }
 
@@ -886,6 +902,41 @@ fun FlattenScreen(s: UiState, vm: ChabakViewModel, onHereBounds: (Rect) -> Unit)
                 height = 130.dp,
                 fontSize = 36.sp
             ) { vm.emergencyStop("정지 버튼") }
+            val debuggable = (LocalContext.current.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+            if (s.voiceReady) {
+                Spacer(Modifier.height(22.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.Mic,
+                        contentDescription = null,
+                        tint = if (s.touchStopActive) C.red else C.sub,
+                        modifier = Modifier.size(30.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("\"멈춰\"", color = if (s.touchStopActive) C.text else C.sub, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                }
+                // 진단용: 앱이 들은 말 (디버그 빌드에서만)
+                if (debuggable && s.voiceHeard.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "들은 말: ${s.voiceHeard}",
+                        color = C.sub, fontSize = 17.sp,
+                        maxLines = 2, textAlign = TextAlign.Center,
+                        modifier = Modifier.width(340.dp)
+                    )
+                }
+            }
+            // 마이크 없이 시험하는 버튼: Android Studio에서 실행한(디버그) 빌드에서만 보임
+            if (debuggable) {
+                Spacer(Modifier.height(22.dp))
+                GhostButton(
+                    "멈춰 (테스트)",
+                    Modifier.width(260.dp).onGloballyPositioned { onVoiceTestBounds(it.boundsInRoot()) },
+                    height = 64.dp
+                ) { vm.testVoiceStop() }
+            } else {
+                LaunchedEffect(Unit) { onVoiceTestBounds(Rect.Zero) }
+            }
         }
     }
 }
@@ -1232,13 +1283,11 @@ fun MorningScreen(s: UiState, vm: ChabakViewModel) {
             }
         }
         Column(
-            Modifier.width(460.dp).fillMaxHeight(),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+            Modifier.width(400.dp).fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Panel(Modifier.fillMaxWidth()) {
-                Sub("평탄화 전 자세로 돌아가요", 18.sp)
-                Sub("움직이는 중 화면을 누르면 멈춰요", 18.sp)
-            }
+            // 평탄화 전 안전 점검 화면과 같은 '멈추는 방법' (음성 포함)
+            StopMethods(Modifier.weight(1f), voice = s.voiceReady)
             BigButton("운전 자세로 복귀", enabled = !s.touchStopActive && s.canStart()) {
                 if (!vm.returnToDrive()) showPin = true
             }
@@ -1481,7 +1530,7 @@ fun LogPanel(lines: List<String>, modifier: Modifier, onClose: () -> Unit) {
             TextButton(onClick = onClose) { Text("닫기", color = C.sub) }
         }
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            lines.takeLast(40).reversed().forEach { Text(it, color = C.sub, fontSize = 15.sp) }
+            lines.takeLast(80).reversed().forEach { Text(it, color = C.sub, fontSize = 15.sp) }
         }
     }
 }

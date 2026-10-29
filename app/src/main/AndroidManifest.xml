@@ -19,10 +19,17 @@
     <uses-permission android:name="pleos.car.permission.CONTROL_CAR_SEATS" />
     <uses-permission android:name="pleos.car.permission.CONTROL_CAR_WINDOWS" />
 
-    <!-- 음성 안내(TTS) 엔진 조회 -->
+    <!-- 음성 정지('멈춰'): Pleos SpeechToText SDK, 안 되면 안드로이드 기본 음성 인식 -->
+    <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- 음성 안내(TTS) 엔진, 음성 인식 서비스 조회 -->
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
 

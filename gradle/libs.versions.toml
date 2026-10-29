@@ -6,6 +6,7 @@ lifecycle = "2.9.0"
 activityCompose = "1.10.1"
 composeBom = "2024.04.01"
 vehicleSdk = "2.3.2"
+speechToText = "3.3.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -19,6 +20,7 @@ androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 vehicle-sdk = { module = "ai.pleos.playground:Vehicle", version.ref = "vehicleSdk" }
+speech-to-text = { module = "ai.pleos.playground:SpeechToText", version.ref = "speechToText" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

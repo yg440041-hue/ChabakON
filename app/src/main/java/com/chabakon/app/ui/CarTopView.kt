@@ -8,6 +8,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.Canvas
@@ -192,7 +193,7 @@ private fun DrawScope.drawMovingSeat(o: Offset, s: Size, blink: Float) {
 }
 /** 멈추는 방법: 급할 때 바로 보이도록 오른쪽에 큰 볼록 버튼 3개 (테두리 선 없음) */
 @Composable
-fun StopMethods(modifier: Modifier = Modifier) {
+fun StopMethods(modifier: Modifier = Modifier, voice: Boolean = false) {
     Column(modifier.fillMaxWidth()) {
         Text("멈추는 방법", color = Color(0xFFFF8A8A), fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(12.dp))
@@ -200,6 +201,8 @@ fun StopMethods(modifier: Modifier = Modifier) {
             StopRow(Icons.Filled.TouchApp, "화면 터치", "아무 곳이나 누르기", Modifier.weight(1f))
             StopRow(Icons.Filled.Stop, "정지 버튼", "빨간 버튼 누르기", Modifier.weight(1f))
             StopRow(CarDoorIcon, "문 열기", "아무 문이나 열기", Modifier.weight(1f))
+            // 음성 인식을 쓸 수 있을 때만 표시
+            if (voice) StopRow(Icons.Filled.Mic, "음성", "\"멈춰\"라고 말하기", Modifier.weight(1f))
         }
     }
 }

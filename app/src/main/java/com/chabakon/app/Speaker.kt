@@ -1,6 +1,8 @@
 package com.chabakon.app
 
 import android.content.Context
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
 import com.chabakon.app.vehicle.EventLog
 import java.util.Locale
@@ -10,6 +12,8 @@ class Speaker(context: Context) {
 
     @Volatile private var ready = false
     private lateinit var tts: TextToSpeech
+    /** 시트가 움직이는 동안 내는 경고음 (후진 경고음처럼) */
+    private val tone: ToneGenerator? = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 70) }.getOrNull()
 
     init {
         tts = TextToSpeech(context.applicationContext) { status ->
@@ -28,7 +32,14 @@ class Speaker(context: Context) {
         if (ready) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "chabakon")
     }
 
+    /** 짧은 삐 소리. 안내 음성이 나오는 중에는 건너뛴다 */
+    fun beep() {
+        if (ready && runCatching { tts.isSpeaking }.getOrDefault(false)) return
+        runCatching { tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150) }
+    }
+
     fun shutdown() {
+        runCatching { tone?.release() }
         runCatching { tts.stop(); tts.shutdown() }
     }
 }

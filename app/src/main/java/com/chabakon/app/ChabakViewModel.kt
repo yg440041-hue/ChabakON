@@ -18,6 +18,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -78,11 +80,20 @@ const val SENSOR_ITEMS = 4
 /** 시트 한 단계가 최소로 걸리는 시간(ms). 너무 빨리 끝나 멈출 틈이 없지 않도록 */
 const val STEP_MIN_MS = 4000L
 
+/** 시트가 이만큼(90%) 가기 전에 멈추면 '끼임'으로 보고 즉시 정지한다 */
+const val JAM_LIMIT = 0.9f
+
 data class UiState(
     val screen: Screen = Screen.HOME,
     val simulation: Boolean = false,
     val car: CarState = CarState(),
     val manualConfirm: Boolean = false,
+    /** 좌석 사이·발밑에 아이, 반려동물, 물건이 없는지 눈으로 확인했는지 */
+    val areaClear: Boolean = false,
+    /** 음성 정지('멈춰')를 쓸 수 있는지 */
+    val voiceReady: Boolean = false,
+    /** 진단용: 마지막으로 들은 말 (디버그 빌드 화면에만 표시) */
+    val voiceHeard: String = "",
     val childUnlocked: Boolean = false,
     /** 어린이 보호 잠금 사용 여부 (기본 켜짐) */
     val childLockEnabled: Boolean = true,
@@ -132,7 +143,8 @@ data class UiState(
             )
         } else {
             CheckItem("어린이 보호 잠금", "사용 안 함", true)
-        }
+        },
+        CheckItem("좌석 사이·발밑 비어 있음", "아이, 반려동물, 물건", areaClear)
     )
 
     /** 차량에서 확인할 수 없는(센서 없음) 항목이 있는지 */
@@ -194,9 +206,34 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
 
     val simGateway: SimGateway? get() = gateway as? SimGateway
 
+    /** 이번 작동에서 실제로 움직인 적이 있는 단계 (끼임 판단용) */
+    private val movedSteps = HashSet<String>()
+    private var revertMoved = false
+
+    /** 음성 정지: 시트 작동 중 '멈춰'를 들으면 즉시 정지 */
+    private val voice = VoiceStop(
+        app,
+        onEngine = { e -> _ui.update { it.copy(voiceReady = e != VoiceStop.Engine.NONE) } },
+        onStop = { emergencyStop("음성 명령") },
+        onHeard = { t -> _ui.update { it.copy(voiceHeard = t) } }
+    )
+
     init {
         loadSeatMemo()
         attachGateway()
+        voice.init()
+        // 시트가 움직이는 동안(카운트다운 포함)만 듣는다
+        viewModelScope.launch {
+            _ui.map { it.touchStopActive }.distinctUntilChanged().collect { voice.setActive(it) }
+        }
+        // 시트가 움직이는 동안 주변 사람이 알 수 있게 경고음
+        viewModelScope.launch {
+            while (isActive) {
+                delay(900)
+                val s = _ui.value
+                if ((s.phase == FlatPhase.RUNNING || s.phase == FlatPhase.REVERTING) && s.countdown == 0) speaker.beep()
+            }
+        }
     }
 
     // ---------------------------------------------------------------- 평탄화 전 위치 저장 (앱을 다시 켜도 아침에 복귀 가능)
@@ -267,12 +304,25 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
 
     fun go(screen: Screen) {
         if (_ui.value.touchStopActive) return
-        _ui.update { it.copy(screen = screen) }
+        // 홈으로 나가면 다음에 들어올 때 좌석 주변을 다시 확인하게
+        _ui.update { it.copy(screen = screen, areaClear = if (screen == Screen.HOME) false else it.areaClear) }
     }
 
     fun setManualConfirm(v: Boolean) = _ui.update { it.copy(manualConfirm = v) }
 
-    fun refreshCar() = gateway.refresh()
+    fun setAreaClear(v: Boolean) = _ui.update { it.copy(areaClear = v) }
+
+    /** 마이크 없이 음성 정지 흐름을 시험하는 버튼용 (디버그 빌드에서만 보임) */
+    fun testVoiceStop() {
+        EventLog.add("음성 정지 테스트 버튼")
+        emergencyStop("음성 명령")
+    }
+
+    /** '다시 확인': 센서 값을 새로 읽고, 눈으로 확인한 항목도 처음부터 다시 확인하게 한다 */
+    fun refreshCar() {
+        _ui.update { it.copy(areaClear = false, manualConfirm = false) }
+        gateway.refresh()
+    }
 
     // ---------------------------------------------------------------- 어린이 보호 잠금
 
@@ -386,6 +436,7 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
         }
         // 이전 평탄화가 아직 복귀되지 않았으면 '처음 위치' 기록을 지우지 않는다 (굿모닝 복귀용)
         if (!s.campOn) startPos.clear()
+        movedSteps.clear()
         _ui.update { it.copy(screen = Screen.FLATTEN, returning = false, steps = steps, phase = FlatPhase.COUNTDOWN, stopReason = null) }
         runJob?.cancel()
         runJob = viewModelScope.launch {
@@ -427,6 +478,7 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
             _ui.update { it.copy(flatDone = true) }
             EventLog.add("평탄화 완료")
         }
+        _ui.update { it.copy(areaClear = false) }
         relock()
     }
 
@@ -532,7 +584,13 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
                 lastSig = sig
                 lastChange = now
             }
+            if (sig != firstSig) movedSteps += step.title
             val stalled = sig.isNotEmpty() && now - lastChange > 1500 && now - t0 > 1500
+            // 움직이던 시트가 목표 전에 멈춤 = 무언가 끼었을 수 있음
+            if (stalled && !allBack && values.isNotEmpty() && step.title in movedSteps && values.min() < JAM_LIMIT) {
+                jamStop(step.title, values.min())
+                return
+            }
             val minDone = now - t0 >= STEP_MIN_MS
             if (((allBack || p >= 0.99f || stalled) && minDone) || now - t0 > 20_000) {
                 step.keys.forEach { gateway.moveSeat(it, Move.STOP) }
@@ -625,7 +683,14 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
                 lastSig = sig
                 lastChange = now
             }
+            if (moved) movedSteps += step.title
             val stalled = sig.isNotEmpty() && now - lastChange > 1500 && now - t0 > 1500
+            // 움직이던 시트가 끝에 닿기 전에 멈춤 = 무언가 끼었을 수 있음
+            val realP = realProgress(step, worst = true)
+            if (stalled && realP != null && step.title in movedSteps && realP < JAM_LIMIT) {
+                jamStop(step.title, realP)
+                return
+            }
             val minDone = now - t0 >= STEP_MIN_MS
             if ((p >= 0.99f && minDone) || (stalled && minDone) || now - t0 > 20_000) {
                 step.keys.forEach { gateway.moveSeat(it, Move.STOP) }
@@ -651,7 +716,11 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun computeProgress(step: FlatStep, elapsed: Long): Float {
+    private fun computeProgress(step: FlatStep, elapsed: Long): Float =
+        realProgress(step) ?: (elapsed / 6000f).coerceIn(0f, 1f)
+
+    /** 실제 시트 위치로 본 진행률. 위치·범위 정보가 없으면 null */
+    private fun realProgress(step: FlatStep, worst: Boolean = false): Float? {
         val car = _ui.value.car
         val values = step.keys.mapNotNull { k ->
             val start = startPos[k] ?: return@mapNotNull null
@@ -663,7 +732,17 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
             val total = (target - start).toFloat()
             if (total == 0f) 1f else ((pos - start) / total).coerceIn(0f, 1f)
         }
-        return if (values.isEmpty()) (elapsed / 6000f).coerceIn(0f, 1f) else values.average().toFloat()
+        return when {
+            values.isEmpty() -> null
+            worst -> values.min()   // 끼임 판단은 가장 덜 간 좌석 기준
+            else -> values.average().toFloat()
+        }
+    }
+
+    /** 끼임 감지: 즉시 정지하고 경고 */
+    private fun jamStop(title: String, p: Float) {
+        EventLog.add("끼임 감지: '$title' ${(p * 100).toInt()}%에서 시트가 더 움직이지 않음")
+        emergencyStop("끼임 감지", "시트가 무언가에 막혀 멈췄어요. 좌석 주변을 확인한 뒤 선택하세요.")
     }
 
 
@@ -717,13 +796,13 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 화면 터치 · 정지 버튼 · 문 열림 · 착석 감지 시 즉시 정지 */
-    fun emergencyStop(reason: String) {
+    fun emergencyStop(reason: String, voice: String = "즉시 정지했어요. 뒷좌석을 확인한 뒤 선택하세요.") {
         val ph = _ui.value.phase
         if (ph != FlatPhase.RUNNING && ph != FlatPhase.COUNTDOWN && ph != FlatPhase.REVERTING) return
         runJob?.cancel()
         gateway.stopAllSeats()
         _ui.update { it.copy(phase = FlatPhase.PAUSED, stopReason = reason, countdown = 0) }
-        speaker.say("즉시 정지했어요. 뒷좌석을 확인한 뒤 선택하세요.")
+        speaker.say(voice)
         EventLog.add("즉시 정지: $reason")
     }
 
@@ -753,12 +832,15 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
             _ui.update { it.copy(phase = FlatPhase.REVERTING, stopReason = null) }
             speaker.say("원래 자세로 돌아갑니다.")
             doRevert()
+            // 원위치 중 끼임으로 멈췄으면 그대로 멈춘 상태 유지
+            if (_ui.value.phase != FlatPhase.REVERTING) return@launch
             revertPending = false
+            revertMoved = false
             _ui.update {
                 it.copy(
                     phase = FlatPhase.IDLE, steps = emptyList(),
                     screen = if (toHome) Screen.HOME else Screen.CHECK,
-                    toast = "원위치 완료"
+                    toast = "원위치 완료", areaClear = false
                 )
             }
             relock()
@@ -797,8 +879,14 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
             if (sig != lastSig) {
                 lastSig = sig
                 lastChange = now
+                revertMoved = true
             }
             val stalled = now - lastChange > 1500 && now - t0 > 1500
+            if (stalled && !allBack && revertMoved) {
+                EventLog.add("끼임 감지: 원위치 중 시트가 더 움직이지 않음")
+                emergencyStop("끼임 감지", "시트가 무언가에 막혀 멈췄어요. 좌석 주변을 확인한 뒤 선택하세요.")
+                return
+            }
             if (allBack || stalled || now - t0 > 25_000) break
         }
         gateway.stopAllSeats()
@@ -998,6 +1086,7 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
         guardJob?.cancel()
         runJob?.cancel()
         originPos.clear()
+        movedSteps.clear()
         val steps = buildReturnSteps()
         _ui.update {
             it.copy(
@@ -1049,6 +1138,7 @@ class ChabakViewModel(app: Application) : AndroidViewModel(app) {
         runJob?.cancel()
         guardJob?.cancel()
         gateway.release()
+        voice.release()
         speaker.shutdown()
         super.onCleared()
     }

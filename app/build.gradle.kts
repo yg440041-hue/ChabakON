@@ -48,6 +48,7 @@ android {
 
 dependencies {
     implementation(libs.vehicle.sdk)
+    implementation(libs.speech.to.text)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

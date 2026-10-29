@@ -5,13 +5,13 @@
 현대자동차그룹 차량용 앱 개발 공모전(Pleos Playground) 출품작입니다.
 안전 점검 → 단계별 시트 평탄화 → 잠자리 모드(공조·환기·취침등·잠금) → 밤샘 배터리 관리 → 아침 운전 자세 복귀까지 한 흐름으로 제공합니다.
 
-- 시연 영상(에뮬레이터 실제 동작): https://youtu.be/I2pbKH8qLnI
+- 시연 영상(에뮬레이터 실제 동작, 약 2분 19초): https://youtu.be/2QtC7dmzokQ
 
 ---
 
 ## APK 파일 위치
 
-- 이 저장소의 **Releases** 페이지(https://github.com/yg440041-hue/ChabakON/releases/tag/v0.1.0) → **v0.1.0** → `KimIro_ChabakON_release.apk` (약 45MB, GitHub 웹 업로드 용량 초과로 Releases에 등록)
+- 이 저장소의 **Releases** 페이지(https://github.com/yg440041-hue/ChabakON/releases/tag/v0.2.0) → **v0.2.0** → `KimIro_ChabakON_release.apk` (GitHub 웹 업로드 용량 초과로 Releases에 등록)
 - release 빌드이며, 바로 설치·실행할 수 있도록 서명되어 있습니다.
 
 ---
@@ -41,7 +41,7 @@
 |---|---|
 | Android Studio | 2026.2 이상 |
 | 에뮬레이터 | Pleos Connect Emulator v2.1.0 (Android API 34, Automotive, RAM 4GB, Cold boot) |
-| Pleos SDK | Vehicle SDK 2.3.2 (`ai.pleos.playground:Vehicle`, 공개 저장소 nexus-playground.pleos.ai) |
+| Pleos SDK | Vehicle SDK 2.3.2, SpeechToText SDK 3.3.1 (`ai.pleos.playground:Vehicle`, `ai.pleos.playground:SpeechToText`, 공개 저장소 nexus-playground.pleos.ai) |
 | 빌드 | minSdk 28, compileSdk 35, Kotlin 2.0, Jetpack Compose |
 
 ### 에뮬레이터 이미지 추가
@@ -61,24 +61,27 @@ adb forward tcp:8088 tcp:8088
 - **어린이 보호 잠금 PIN 기본값: `0000`** (상단 'PIN 설정'에서 변경·끄기 가능)
 - PIN 초기화: 브레이크 페달을 밟은 상태(Virtual Console > Motion > 브레이크 페달 > 0 초과)에서 'PIN을 잊었어요' → '5초간 누르기'
 - 에뮬레이터 기본값은 2열에 사람이 앉아 있는 상태라 시작 버튼이 꺼져 있습니다. Virtual Console에서 2열 좌석을 비워 주세요.
+- 음성 정지 시험: 에뮬레이터 Extended Controls > Microphone > **Enable Host Microphone Access** 를 켜고, 평탄화 중에 멈춰라고 또렷하게 말합니다.
 - 상단 '로그' 칩: 모든 SDK 호출 결과 확인
 
 ---
 
 ## 주요 기능
 
-- **안전 점검 5가지**: 2열 비어 있음(착석 센서), 안전벨트 해제, 기어 P, 옆문 닫힘(트렁크는 열려도 됨), 어린이 보호 잠금. 센서 값이 없는 항목은 사용자 확인으로 대체
+- **안전 점검 6가지**: 2열 비어 있음(착석 센서), 안전벨트 해제, 기어 P, 옆문 닫힘(트렁크는 열려도 됨), 어린이 보호 잠금, 좌석 사이·발밑 비어 있음(눈으로 확인 후 [확인했어요]). 센서 값이 없는 항목은 사용자 확인으로 대체
 - **3D 좌석 평면도**: 2열 좌석별 상태 색 표시, 움직이는 시트 빨간 깜박임
 - **세이프 오토 평탄화**: 3초 카운트다운 + 음성 안내, 단계별 진행 막대(앞좌석 앞뒤 → 등받이 → 헤드레스트 → 2열 등받이)
   - '여기까지' → 그 자리에서 멈춤, 같은 자리 버튼이 '계속하기'로 바뀜, '이 위치로 다음 단계'로 확정
-  - 즉시 정지: 화면 아무 곳 터치 / 정지 버튼 / 문 열림 / 2열 착석 감지
+  - 즉시 정지: 화면 아무 곳 터치 / 정지 버튼 / 문 열림 / 2열 착석 감지 / **음성("멈춰", "정지", "그만", "잠깐")**
+  - **끼임 감지**: 움직이던 시트가 목표 위치의 90% 전에 멈추면 즉시 정지(평탄화·원위치·복귀 모두)
+  - **작동 중 경고음**: 시트가 움직이는 동안 약 1초 간격으로 경고음
   - 처음 위치 저장(앱 재실행 후에도 유지), 이미 평탄화된 경우 시작 버튼 비활성
 - **잠자리 모드**: 전체 선택 + 항목별 온오프(공조, 2열 창문 환기, 화면 취침등, 2열 시트 열선, 도어 잠금), 켜진 상태에서 바꾸면 즉시 반영, 설정 저장
 - **배터리 가디언**: 하한선까지 버틸 시간 표시, 하한선 근처에서 풍량 자동 감소
 - **굿모닝 복귀**: 차박 모드 후에만 활성화, 기상 알람·일출 화면, 출발 전 안전 점검 후 평탄화 전 위치로 단계별 복귀
-- **어린이 보호 잠금**: PIN 해제 후 5분 유지, 작동 완료 시 자동 재잠금, 브레이크 페달 + 5초 누르기로 PIN 초기화
+- **어린이 보호 잠금**: PIN 해제 후 5분 유지, 작동 완료 시 자동 재잠금, PIN 설정에서 PIN 변경·잠금 끄기(현재 PIN 필요), 브레이크 페달 + 5초 누르기로 PIN 초기화
 
-## 사용한 Pleos Vehicle SDK
+## 사용한 Pleos SDK
 - **Seat**: 착석 감지, 안전벨트, 앞뒤 이동·등받이·헤드레스트 이동(MoveControl FORWARD/BACKWARD/STOP)과 위치 리스너, 시트 메모리, 2열 열선
 - **Door**: 도어·테일게이트 열림 상태, 도어 잠금
 - **HVAC / Window**: 공조 전원·온도·풍량, 2열 창문 환기
@@ -88,7 +91,8 @@ adb forward tcp:8088 tcp:8088
 ## 알려진 제한 및 다음 계획
 - 앰비언트 조명 밝기 제어: 현재 SDK 공개 API에 설정 함수가 없어 화면 취침등으로 대체
 - SDK 2.3.2 에뮬레이터에서 착석 값이 VHAL 표준(1=비어 있음)과 반대로 해석되어 앱에서 보정
-- 다음 계획: '멈춰' 음성 정지(SpeechToText SDK), 차박 장소 도우미(FusedLocation / NaviHelper)
+- 에뮬레이터에는 한국어 TTS 엔진이 없어 카운트다운 안내 음성이 들리지 않을 수 있습니다(실차·TTS 엔진 설치 기기에서는 정상)
+- 다음 계획: 실차 마이크 환경 음성 인식률 검증, 차박 장소 도우미(FusedLocation / NaviHelper)
 
 ## 출처 및 라이선스
 - 차량 3D 모델: "2022 Mahindra Scorpio-N" by BHP3D (CC BY 4.0), 지붕 절단·색상 변경 후 렌더링 (`CAR_MODEL_CREDIT.txt`)
